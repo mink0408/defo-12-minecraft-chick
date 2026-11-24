@@ -1,0 +1,277 @@
+﻿<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-Frame Minecraft Chick in Flower Meadow</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="minecraft_bg_data.js"></script>
+    <script>
+      // 마인크래프트 꽃밭 일출 360 파노라마 배경 컴포넌트
+      AFRAME.registerComponent("minecraft-sky", {
+        init: function () {
+          var skyEl = this.el;
+          var src = window.MINECRAFT_BG_DATA || "minecraft_bg.jpg";
+          var loader = new THREE.TextureLoader();
+          loader.load(src, function (tex) {
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.repeat.set(4, 1);
+            var mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              side: THREE.BackSide,
+            });
+            skyEl.getObject3D("mesh").material = mat;
+          });
+        },
+      });
+
+      var chickTemplate = null;
+
+      function createReal3DChickModel() {
+        var group = new THREE.Group();
+
+        // 1. 얼굴/몸통 텍스처 (사진 원본 1:1 재현)
+        // 앞면: 노란색 기본 + 하단 주황 그라데이션 + 중앙 연노랑 하이라이트 + 2개의 사각 눈
+        var faceCanvas = document.createElement("canvas");
+        faceCanvas.width = 256;
+        faceCanvas.height = 256;
+        var fCtx = faceCanvas.getContext("2d");
+
+        // 기본 노랑
+        fCtx.fillStyle = "#f5d542";
+        fCtx.fillRect(0, 0, 256, 256);
+
+        // 하단 주황 그라데이션 영역 (사진의 바닥 주황 음영)
+        var grad = fCtx.createLinearGradient(0, 160, 0, 256);
+        grad.addColorStop(0, "rgba(235, 145, 25, 0)");
+        grad.addColorStop(1, "rgba(225, 130, 18, 1)");
+        fCtx.fillStyle = grad;
+        fCtx.fillRect(0, 160, 256, 96);
+
+        // 이마 중앙 연노랑 하이라이트
+        fCtx.fillStyle = "#faea72";
+        fCtx.fillRect(80, 0, 96, 175);
+
+        // 두 개의 진갈색 사각 눈 (사진 위치 그대로)
+        fCtx.fillStyle = "#382313";
+        fCtx.fillRect(40, 110, 38, 38);
+        fCtx.fillRect(178, 110, 38, 38);
+
+        var faceTex = new THREE.CanvasTexture(faceCanvas);
+
+        // 옆면 및 뒷면 텍스처 (하단 주황 음영 연결)
+        var sideCanvas = document.createElement("canvas");
+        sideCanvas.width = 256;
+        sideCanvas.height = 256;
+        var sCtx = sideCanvas.getContext("2d");
+        sCtx.fillStyle = "#f3d33e";
+        sCtx.fillRect(0, 0, 256, 256);
+        var sGrad = sCtx.createLinearGradient(0, 160, 0, 256);
+        sGrad.addColorStop(0, "rgba(235, 145, 25, 0)");
+        sGrad.addColorStop(1, "rgba(225, 130, 18, 1)");
+        sCtx.fillStyle = sGrad;
+        sCtx.fillRect(0, 160, 256, 96);
+        var sideTex = new THREE.CanvasTexture(sideCanvas);
+
+        var topMat = new THREE.MeshStandardMaterial({
+          color: 0xfae750,
+          roughness: 0.5,
+          metalness: 0.05,
+        });
+        var bottomMat = new THREE.MeshStandardMaterial({
+          color: 0xe5901c,
+          roughness: 0.5,
+          metalness: 0.05,
+        });
+        var faceMat = new THREE.MeshStandardMaterial({
+          map: faceTex,
+          roughness: 0.5,
+          metalness: 0.05,
+        });
+        var sideMat = new THREE.MeshStandardMaterial({
+          map: sideTex,
+          roughness: 0.5,
+          metalness: 0.05,
+        });
+
+        // 박스 6면: [우, 좌, 상, 하, 전, 후]
+        var bodyMaterials = [
+          sideMat,
+          sideMat,
+          topMat,
+          bottomMat,
+          faceMat,
+          sideMat,
+        ];
+
+        // 3D 입체 몸통 큐브
+        var body = new THREE.Mesh(
+          new THREE.BoxGeometry(0.38, 0.38, 0.38),
+          bodyMaterials
+        );
+        body.position.set(0, 0, 0);
+        group.add(body);
+
+        // 2. 3D 입체 튀어나온 부리 (사진의 갈색 사각 큐브)
+        var beakTopMat = new THREE.MeshStandardMaterial({
+          color: 0xa46e42,
+          roughness: 0.6,
+        });
+        var beakFrontMat = new THREE.MeshStandardMaterial({
+          color: 0x885630,
+          roughness: 0.6,
+        });
+        var beakBottomMat = new THREE.MeshStandardMaterial({
+          color: 0x6e4222,
+          roughness: 0.6,
+        });
+        var beakMaterials = [
+          beakFrontMat,
+          beakFrontMat,
+          beakTopMat,
+          beakBottomMat,
+          beakFrontMat,
+          beakFrontMat,
+        ];
+        var beak = new THREE.Mesh(
+          new THREE.BoxGeometry(0.13, 0.08, 0.09),
+          beakMaterials
+        );
+        beak.position.set(0, -0.045, 0.225);
+        group.add(beak);
+
+        // 3. 3D 입체 양쪽 날개 날개깃 (사진의 노란 날개)
+        var wingMat = new THREE.MeshStandardMaterial({
+          color: 0xebcd3c,
+          roughness: 0.5,
+        });
+        var wingGeom = new THREE.BoxGeometry(0.06, 0.035, 0.16);
+
+        var leftWing = new THREE.Mesh(wingGeom, wingMat);
+        leftWing.position.set(-0.21, -0.015, 0.02);
+        group.add(leftWing);
+
+        var rightWing = new THREE.Mesh(wingGeom, wingMat);
+        rightWing.position.set(0.21, -0.015, 0.02);
+        group.add(rightWing);
+
+        // 4. 3D 입체 두 다리/발 (사진의 진갈색 사각 다리)
+        var legMat = new THREE.MeshStandardMaterial({
+          color: 0x68472d,
+          roughness: 0.7,
+        });
+        var legGeom = new THREE.BoxGeometry(0.065, 0.14, 0.08);
+
+        var leftLeg = new THREE.Mesh(legGeom, legMat);
+        leftLeg.position.set(-0.08, -0.25, 0.01);
+        group.add(leftLeg);
+
+        var rightLeg = new THREE.Mesh(legGeom, legMat);
+        rightLeg.position.set(0.08, -0.25, 0.01);
+        group.add(rightLeg);
+
+        return group;
+      }
+
+      AFRAME.registerComponent("minecraft-chick", {
+        init: function () {
+          if (!chickTemplate) {
+            chickTemplate = createReal3DChickModel();
+          }
+          var model = chickTemplate.clone(true);
+          this.el.setObject3D("mesh", model);
+        },
+      });
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #fbcfe8;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene>
+      <!-- 마인크래프트 꽃밭 일출 360 파노라마 스카이 -->
+      <a-sky minecraft-sky></a-sky>
+
+      <!-- 일출 따뜻한 자연광 조명 -->
+      <a-entity light="type: ambient; color: #fff0e2; intensity: 0.9"></a-entity>
+      <a-entity
+        light="type: directional; color: #ffebd2; intensity: 1.15"
+        position="4 10 5"
+      ></a-entity>
+
+      <a-entity id="camera-rig" position="0 1.6 0">
+        <a-camera position="0 0 0"></a-camera>
+
+        <!-- 양옆으로(수평) 회전하는 25개의 마인크래프트 병아리 궤도 -->
+        <a-entity
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 9000; easing: linear;"
+        >
+          <a-entity position="2.8 0 0" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.71 0 0.7" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.45 0 1.35" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.04 0 1.92" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="1.5 0 2.36" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0.87 0 2.66" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0.18 0 2.79" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-0.52 0 2.75" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-1.19 0 2.53" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-1.78 0 2.16" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.27 0 1.65" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.6 0 1.03" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.78 0 0.35" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.78 0 -0.35" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.6 0 -1.03" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-2.27 0 -1.65" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-1.78 0 -2.16" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-1.19 0 -2.53" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="-0.52 0 -2.75" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0.18 0 -2.79" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0.87 0 -2.66" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="1.5 0 -2.36" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.04 0 -1.92" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.45 0 -1.35" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="2.71 0 -0.7" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+        </a-entity>
+
+        <!-- 위아래로(수직) 회전하는 25개의 마인크래프트 병아리 궤도 -->
+        <a-entity
+          animation="property: rotation; to: 360 0 0; loop: true; dur: 9000; easing: linear;"
+        >
+          <a-entity position="0 0 2.8" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 0.7 2.71" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 1.35 2.45" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 1.92 2.04" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.36 1.5" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.66 0.87" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.79 0.18" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.75 -0.52" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.53 -1.19" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 2.16 -1.78" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 1.65 -2.27" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 1.03 -2.6" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 0.35 -2.78" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -0.35 -2.78" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -1.03 -2.6" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -1.65 -2.27" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.16 -1.78" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.53 -1.19" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.75 -0.52" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.79 0.18" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.66 0.87" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -2.36 1.5" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -1.92 2.04" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -1.35 2.45" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+          <a-entity position="0 -0.7 2.71" minecraft-chick animation="property: rotation; to: 0 360 0; loop: true; dur: 4400; easing: linear;"></a-entity>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
